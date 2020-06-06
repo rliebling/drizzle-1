@@ -55,7 +55,6 @@ defmodule Drizzle.MixProject do
       {:cubdb, "~> 1.0.0-rc.3"},
       {:finch, "~> 0.2.0"},
       {:jason, "~> 1.2.1"},
-      #{:drizzle_ui, path: "drizzle_ui", runtime: false},
       {:drizzle_ui, path: "drizzle_ui"},
       {:nerves, "~> 1.6", runtime: false},
       {:shoehorn, "~> 0.6"},
