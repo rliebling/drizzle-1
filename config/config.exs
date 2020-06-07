@@ -12,8 +12,10 @@ config :nerves, :firmware, rootfs_overlay: "rootfs_overlay"
 config :nerves, source_date_epoch: "1591293559"
 
 config :drizzle,
-  location: %{latitude: System.get_env("LATITUDE"), longitude: System.get_env("LONGITUDE")},
-  utc_offset: 2,
+  location: %{
+    latitude:  System.get_env("LATITUDE")  || 38.0621576,
+    longitude: System.get_env("LONGITUDE") || 23.8155186
+  },
   winter_months: [:jan, :feb, :nov, :dec],
   # soil_moisture_sensor: %{pin: 26, min: 0, max: 539},
   # For Waveshare RPi relay board (B variant, 8 relays)
