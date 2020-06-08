@@ -33,6 +33,7 @@ defmodule Drizzle.Scheduler do
   # }
   # r(Drizzle.Scheduler);  state |> Drizzle.Scheduler.todays_tasks
 
+  @spec start_link(any) :: :ignore | {:error, any} | {:ok, pid}
   def start_link(_args) do
     GenServer.start_link(__MODULE__, %{}, name: DrizzleScheduler)
   end
@@ -99,6 +100,7 @@ defmodule Drizzle.Scheduler do
   defp freqexpr({:every, x, :days}),  do: %{dow_divisor: x}
   defp freqexpr({:on, arr_of_days}),  do: %{dow: Enum.map(arr_of_days, &(Timex.day_to_num(&1)))}
   defp freqexpr({}), do: %{}
+
   # cron expression for triggers ==> hour+minute
   defp parse_trigger({:chain,   :after, zone}, _state), do: zone #FIXME, pass scb so that zone1 deact triggers zone2 act
   defp parse_trigger({:exactly, :at,  event}, state) when event in [:midnight, :sunrise, :noon, :sunset], do: evttime(event, state)
@@ -114,19 +116,24 @@ defmodule Drizzle.Scheduler do
   defp evtexpr(%DateTime{} = dt), do: %{hour: dt.hour, min: dt.minute}
   defp evtexpr(_), do: %{}
 
-  def next_occurrence(%{dow: "*"}, trig) do
-    join_date_time(Timex.today, trig) |> shift_to_future()
-  end
-  def next_occurrence(%{dow: [arr]}, trig) do
+  # for "*" simply get the next datetime in the future that matches the trigger time
+  def next_occurrence(%{dow: "*"}, trig), do: join_date_time(Timex.today, trig) |> shift_to_future()
+  # for list of days trigger, walk up from the current week up to 1 week later to find a datetime
+  def next_occurrence(%{dow: arr}, trig) when is_list(arr) do
     {year, weeknum, _dow} = Timex.iso_triplet(Timex.now)
     for week_advance <- 0..1, day_of_week <- arr do
-      {year, weeknum+week_advance, day_of_week} |> join_date_time(trig)
+      Timex.from_iso_triplet({year, weeknum+week_advance, day_of_week}) |> join_date_time(trig)
     end |> Enum.find(fn(candidate) -> candidate |> Timex.after?(Timex.now()) end)
   end
+  # for "every X days" trigger, find future date whose day is divisible by X
   def next_occurrence(%{dow_divisor: dd}, trig) do
     for days_advance <- 0..dd do
       Date.utc_today |> join_date_time(trig) |> shift_to_future(days_advance)
-    end |> Enum.find(fn(candidate) -> candidate |> Timex.after?(Timex.now()) end)
+    end
+    |> Enum.find(fn(candidate) ->
+      {{_y,_m,d},{_,_,_}} = Timex.to_erl(candidate)
+      (candidate |> Timex.after?(Timex.now()) and rem(d, dd)==0
+    ) end)
   end
   def next_occurrence(%{}, %{}), do: nil
 
